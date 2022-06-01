@@ -50,21 +50,19 @@
                 alert('암호를 입력하여 주세요.');
                 return;
             }
-            const loginData = {
-                    authorName: authorName,
-                    password: password,
-                }
             $.ajax({
                 type: "POST",
-                url: "/login",
-                headers: {'Content-Type': 'application/json'},
-                data: JSON.stringify(loginData),
+                url: "api/login",
+                data: {
+                    authorName: authorName,
+                    password: password,
+                },
                 success: function (response) {
                     localStorage.setItem("token", response.token);
                     window.location.replace("/");
                 },
                 error: function (error) {
-                    alert(error.responseJSON.errorMessage);
+                    alert("로그인에 실패하였습니다.");
                 },
             });
         }
