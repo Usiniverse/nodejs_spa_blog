@@ -39,10 +39,10 @@
         }
 
         function signIn() {
-            let userId = $("#userId").val();
+            let authorName = $("#authorName").val();
             let password = $("#password").val();
-            if (userId == '') {
-                $('#userId').focus()
+            if (authorName == '') {
+                $('#authorName').focus()
                 alert('아이디를 입력하여 주세요.');
                 return;
             } else if (password == '') {
@@ -50,13 +50,15 @@
                 alert('암호를 입력하여 주세요.');
                 return;
             }
+            const loginData = {
+                    authorName: authorName,
+                    password: password,
+                }
             $.ajax({
                 type: "POST",
-                url: "/api/login",
-                data: {
-                    userId: userId,
-                    password: password,
-                },
+                url: "/login",
+                headers: {'Content-Type': 'application/json'},
+                data: JSON.stringify(loginData),
                 success: function (response) {
                     localStorage.setItem("token", response.token);
                     window.location.replace("/");

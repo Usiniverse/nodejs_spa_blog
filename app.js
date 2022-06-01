@@ -5,17 +5,20 @@ const jwt = require('jsonwebtoken');
 const User = require("./models/user");
 const Article = require("./models/blog");
 const Comment = require("./models/comment");
-const joi = require("joi");
-const app = express();
-const router = express.Router();
+const authMiddleware = require('./middlewares/auth-middleware');
+const Joi = require("joi");
 const port = 8080;
+const router = express.Router();
 
-
-mongoose.connect("mongodb://127.0.0.1/spa_blog", {
+mongoose.connect("mongodb+srv://test:sparta@cluster0.rx7dw.mongodb.net/?retryWrites=true&w=majority", {
     useNewUrlParser: true,
     useUnifiedTopology: true,
 });
 
+const db = mongoose.connection;
+db.on("error", console.error.bind(console, "connection error:"));
+
+const app = express();
 
 const requestMiddleware = (req, res, next) => {
     console.log("Request URL:", req.originalUrl, " - ", new Date());
@@ -24,11 +27,13 @@ const requestMiddleware = (req, res, next) => {
 
 
 app.use(express.json());
+
 //app.use는 미들웨어. 순서가 중요하다. 위에 있어야 아래의 코드들이 영향을 받음.
 // next함수는 다음 미들웨어로 넘어갈 수 있게 해준다.
 // next 함수를 쓰지 않을 경우 res()를 사용
 app.use(requestMiddleware);
-
+// app.use("/api", express.urlencoded({ extended: false }), router);
+app.use(router);
 
 // get으로 HTTP 웹서버에서 요청을 받았는데 그 경로가 '/'
 // req와 res라는 객체를 넣게끔 되어 있음. 이게 라우터(Router)
@@ -69,59 +74,149 @@ router.get("/articles", async (req, res) => {
 
 
 
-// 회원가입 API
-router.post('/users', async (req, res) => {
-        const { autherName, password, confirmPassword } = req.body;
+// * 회원가입 API.
+// * 특정 pattern을 미리 정규표현식으로 정의하여, 변수로 선언해둔다.
+// * postUserSchema 는 authorName, password, confirmPassword에 대해 Joi 라이브러리를 통해 조건을 명시함.
+// */
+router.post('/signup', async (req, res) => {
+       // const { nickname, email, password, confirmPassword } = req.body;
+        const { authorName, password, confirmPassword } = req.body;
+            console.log(authorName, password, confirmPassword);
 
         if (password !== confirmPassword) {
+           // 비밀번호, 비밀번호 확인 일치 여부 확인
             res.status(400).send({
-                errorMessage:"패스워드가 패스워드 확인란이 다릅니다."
+                errorMessage:
+                    '비밀번호와 비밀번호 확인의 내용이 일치하지 않습니다.',
+            });
+           return; // 이 코드 이하의 코드를 실행하지 않고 탈출
+        }
+
+        const existUsers = await User.find({ authorName });
+        // console.log(authorName)
+        if (existUsers) {
+           // authorName 중복 데이터가 존재 할 경우
+            res.status(400).send({
+                errorMessage: '중복된 닉네임입니다.',
             });
             return;
         }
 
-        const existsUsers = await user.findOne({ autherName });
-        if (existsUsers) {
-            res.status(400).send({
-                errorMessage:"이메일 또는 닉네임이 사용중입니다."
-            });
-            return;
-        }
-
-        const user = new user({ autherName, password });
+        const user = new User({ authorName, password });
         await user.save();
+
         res.status(201).send({});
-        }
-    );
+    });
+
+
+
+
+
+// // 회원가입 API
+// router.post('/signup', async (req, res) => {
+//         // console.log(req.body);
+//         const { authorName, password, confirmPassword } = req.body;
+//         // console.log(authorName, password, confirmPassword);
+
+//         if (password !== confirmPassword) {
+//             res.status(400).send({
+//                 errorMessage:"패스워드가 패스워드 확인란이 다릅니다."
+//             });
+//             return;
+//         }
+
+//         const existsUsers = await User.findOne({ authorName });
+//         if (existsUsers) {
+//             res.status(400).send({
+//                 errorMessage:"이메일 또는 닉네임이 사용중입니다."
+//             });
+//             return;
+//         }
+
+//         const user = new User({ authorName, password });
+//         await user.save();
+//         res.status(201).send({});
+//         }
+//     );
+
+
+
+    // // * 로그인 API.
+    // router.post('/login', async (req, res) => {
+    //     try {
+    //        // const { email, password } = req.body;
+    //         const { authorName, password } = req.body;
+    //         console.log(authorName, password);
+    
+    //         const user = await User.findOne({ authorName, password });
+    //         if (!user) {
+    //             res.status(400).send({
+    //                 errorMessage: '닉네임 또는 패스워드를 확인해주세요.',
+    //             });
+    //             return;
+    //         } 
+    //         console.log(user.authorId);
+    //         console.log(user.authorName);
+    //         console.log(user.password);
+    //        // const token = jwt.sign({ userId: user.userId }, "MY-SECRET-KEY"); // 토큰을 서버쪽에서 sign 하여 생성
+    //         const token = jwt.sign({ authorName: user.authorName }, "yushin-secret-key"); // 토큰을 서버쪽에서 sign 하여 생성
+    //         console.log(token);
+    //        // console.log(typeof(token));
+    //         res.send({
+    //            token, // 전달
+    //         });
+    //         console.log(res.send);
+    //     } catch (err) {
+    //        // console.log(err);
+    //         res.status(400).send({
+    //             errorMessage: '요청한 데이터 형식이 올바르지 않습니다.',
+    //         });
+    //     }
+    // });
+
 
 
 // 로그인 API
 router.post("/login", async (req, res) => {
-    const { userId, password } = req.body;
-
-    const user = await Article.findOne({ userId, password });
+    // console.log(req.body);
+    const { authorName, password } = req.body;
+    console.log(authorName, password);
+    
+    const user = await User.findOne({ authorName, password });
 
     if (!user) {
         res.status(400).send({ errorMessage: "이메일 또는 패스워드가 잘못 되었습니다." });
         return;
     }
 
-    const token = jwt.sign({ userId: user.userId }, "yushin-secret-key");
+    const token = jwt.sign({ authorName: user.authorName }, "yushin-secret-key");
+    console.log(token);
     res.send({
         token,
     });
 });
 
 
-
-// 게시물 목록 API
-router.get("/article", async (req, res) => {
-    const article = await Article.find();
-
-    res.json({
-        article,
+// 내 정보 조회 API, 로그인 시 사용
+router.get('/users/me', authMiddleware, async (req, res) => {
+    // console.log(req.body);
+    console.log(res.locals);
+    // console.log(typeof(res.locals));
+    /**
+     * res.locals 내용 예시
+     * [Object: null prototpye] { user: { _id: new ObjectId("61f..78"), authorName: 'shjin', password: 'mypassword', createdAt: 2022-02-01T10:28:53.882Z, ...  __v: 0 }}
+     */
+    const { user } = res.locals; // user object
+    // console.log(res.locals);
+    // console.log(user);
+    res.send({
+        user: {
+            authorId: user.authorId,
+            authorName: user.authorName,
+        },
     });
 });
+
 
 
 
@@ -155,20 +250,17 @@ router.delete("/article/:articleId/delete", async (req, res) => {
 
 
 // 게시물 작성 API
-router.post("/article", async (req, res) => {
+router.post("/articles/write", async (req, res) => {
     
-    const { userId, title, content } = req.body;
-    
-    const article = await Article.find({ userId });
-    if (article.length) {
-        return res
-        .status(400)
-        .json({ success:false, errorMessage:"이미 있는 데이터입니다" })
-    };
+    const { authorId, title, content, articlePassword } = req.body;
 
-    const createdArticle = await Article.create({ userId, date:new Date(), title, content });
+    const createdArticle = await Article.create({ 
+        authorId, 
+        title, 
+        content, 
+        articlePassword });
     
-    res.json({ article:createdArticle });
+    res.status(201).json({ result: 'success', msg: '글이 등록되었습니다.' });
 });
 
 
