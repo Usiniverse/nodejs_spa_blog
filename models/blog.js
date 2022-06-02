@@ -19,3 +19,4 @@ BlogSchema.set('toJSON', {
 });
 
 module.exports = mongoose.model('Article', BlogSchema);
+
